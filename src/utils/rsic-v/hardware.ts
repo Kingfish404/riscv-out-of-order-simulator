@@ -1,0 +1,70 @@
+export class IntegerRegister {
+    readonly x0: number = 0;
+    x1: number = 0;
+    x2: number = 0;
+    x3: number = 0;
+    x4: number = 0;
+    x5: number = 0;
+    x6: number = 0;
+    x7: number = 0;
+    x8: number = 0;
+    x9: number = 0;
+    x10: number = 0;
+    x11: number = 0;
+    x12: number = 0;
+    x13: number = 0;
+    x14: number = 0;
+    x15: number = 0;
+    x16: number = 0;
+    x17: number = 0;
+    x18: number = 0;
+    x19: number = 0;
+    x20: number = 0;
+    x21: number = 0;
+    x22: number = 0;
+    x23: number = 0;
+    x24: number = 0;
+    x25: number = 0;
+    x26: number = 0;
+    x27: number = 0;
+    x28: number = 0;
+    x29: number = 0;
+    x30: number = 0;
+    x31: number = 0;
+
+}
+
+export class FloatingPointRegister {
+    f0: number = 0;
+    f1: number = 0;
+    f2: number = 0;
+    f3: number = 0;
+    f4: number = 0;
+    f5: number = 0;
+    f6: number = 0;
+    f7: number = 0;
+    f8: number = 0;
+    f9: number = 0;
+    f10: number = 0;
+    f11: number = 0;
+    f12: number = 0;
+    f13: number = 0;
+    f14: number = 0;
+    f15: number = 0;
+    f16: number = 0;
+    f17: number = 0;
+    f18: number = 0;
+    f19: number = 0;
+    f20: number = 0;
+    f21: number = 0;
+    f22: number = 0;
+    f23: number = 0;
+    f24: number = 0;
+    f25: number = 0;
+    f26: number = 0;
+    f27: number = 0;
+    f28: number = 0;
+    f29: number = 0;
+    f30: number = 0;
+    f31: number = 0;
+}
