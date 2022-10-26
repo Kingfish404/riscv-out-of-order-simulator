@@ -1,5 +1,5 @@
 .container {
-  padding: 0 2rem;
+  padding: 1rem 2rem;
 }
 
 .main {
@@ -8,9 +8,8 @@
 
 .title {
   margin: 0;
-  line-height: 1.15;
   font-size: 2rem;
-  padding: 2rem 0;
+  color: unset;
 
   @media (min-width: 600px) {
     font-size: 1.5rem;
@@ -18,6 +17,10 @@
 }
 
 .grid {
+  p {
+    margin: 0.25em 0;
+  }
+
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(45vw, 1fr));
   grid-gap: 2rem;

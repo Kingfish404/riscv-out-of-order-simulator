@@ -31,7 +31,6 @@ export class IntegerRegister {
     x29: number = 0;
     x30: number = 0;
     x31: number = 0;
-
 }
 
 export class FloatingPointRegister {
