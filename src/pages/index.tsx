@@ -19,7 +19,7 @@ const Home: NextPage = () => {
   const [interpreter, setInterpreter] = useState<Interpreter>(new Interpreter(''));
   const [history, setHistory] = useState<Interpreter[]>([]);
   const [code, setCode] = useState(
-    `add x1, x0, x2\naddi x1, x0, 10\nsub x2, x0, x1\n` +
+    `fadd f2,f2,f2\nadd x1, x0, x2\naddi x1, x0, 10\nsub x2, x0, x1\n` +
     `fld f8, 21(x3)\nfld f4, 16(x4)\nfsd f4, 0(x0)\n` +
     `fmul f2, f4, f6\nfsub f10, f8, f4\nfdiv f12, f2, f8\nfadd f8, f10, f4\n`)
   const [reload, setReload] = useState<SetStateAction<boolean>>(false)
@@ -47,7 +47,9 @@ const Home: NextPage = () => {
               onChange={(e: { target: { value: string; }; }) => {
                 setCode(e.target.value);
                 setInterpreter(new Interpreter(e.target.value));
-                setHistory([]);
+                while (history.length > 0) {
+                  history.pop();
+                };
               }}
               placeholder="ASM code"
               autoSize={{ minRows: 10, maxRows: 10 }}
@@ -58,25 +60,21 @@ const Home: NextPage = () => {
                 () => {
                   if (interpreter.cycle === 0) {
                     const new_interpreter = new Interpreter(code);
-                    const new_history: SetStateAction<Interpreter[]> = [];
                     do {
-                      if (new_history.length == 0 ||
-                        new_interpreter.cycle === new_history[new_history.length - 1].cycle + 1) {
-                        new_history.push(structuredClone(new_interpreter));
+                      if (history.length == 0 ||
+                        new_interpreter.cycle === history[history.length - 1].cycle + 1) {
+                        history.push(structuredClone(new_interpreter));
                       }
                     } while (new_interpreter.step() == 0);
-                    setHistory(new_history);
                     setInterpreter(new_interpreter);
                     setContenteditable(true);
                   } else {
-                    const new_history: SetStateAction<Interpreter[]> = [...history];
                     const last_state = structuredClone(interpreter);
                     while (interpreter.step() == 0) {
                       if (interpreter.cycle === last_state.cycle + 1) {
-                        new_history.push(last_state);
+                        history.push(last_state);
                       }
                     }
-                    setHistory(new_history);
                     setReload(!reload);
                   }
                 }
@@ -85,7 +83,7 @@ const Home: NextPage = () => {
                 () => {
                   if (interpreter.cycle === 0) {
                     const new_interpreter = new Interpreter(code);
-                    setHistory([structuredClone(new_interpreter)]);
+                    history.push(structuredClone(new_interpreter))
                     new_interpreter.step();
                     setInterpreter(new_interpreter);
                     setContenteditable(true);
@@ -93,7 +91,7 @@ const Home: NextPage = () => {
                     const last_state = structuredClone(interpreter);
                     interpreter.step();
                     if (interpreter.cycle === last_state.cycle + 1) {
-                      setHistory([...history, structuredClone(last_state)]);
+                      history.push(structuredClone(last_state))
                       setReload(!reload);
                     }
                   }
@@ -104,15 +102,17 @@ const Home: NextPage = () => {
                   if (history.length > 0) {
                     const last_state = history[history.length - 1];
                     Object.assign(interpreter, last_state);
-                    setHistory(history.slice(0, history.length - 1));
+                    history.pop();
                     setReload(!reload);
                   }
                 }
               } >Back</Button>
               <Button onClick={
                 () => {
+                  while (history.length > 0) {
+                    history.pop();
+                  }
                   setInterpreter(new Interpreter(''));
-                  setHistory([]);
                   setContenteditable(false);
                 }
               } >Reset</Button>
@@ -148,20 +148,13 @@ const Home: NextPage = () => {
           <div className={styles.grid_item}>
             <h2>CPU Tomasulo Station</h2>
             <div style={
-              {
-                display: 'flex', flexDirection: 'row',
-                flexWrap: 'wrap', justifyContent: 'space-between',
-              }
+              { display: 'flex', flexDirection: 'row', flexWrap: 'wrap', }
             }>
-              <div style={{ marginBottom: '0.5rem' }}>
+              <div style={{ margin: '0 1rem 1rem 0' }}>
                 <p>Reservation Station</p>
                 <EditableTable data={interpreter.reservation_station} />
               </div>
-              <div style={{ marginBottom: '0.5rem' }}>
-                <p>Load Station</p>
-                <EditableTable data={interpreter.load_station} />
-              </div>
-              <div style={{ marginBottom: '0.5rem' }}>
+              <div style={{ margin: '0 1rem 1rem 0' }}>
                 <p>Floating Point Station</p>
                 <EditableTable data={interpreter.floating_point_station} />
               </div>

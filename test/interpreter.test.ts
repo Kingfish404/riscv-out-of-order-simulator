@@ -4,10 +4,14 @@ import { Interpreter } from '../src/utils/rsic-v';
 function run_code(code: string) {
     const interpreter = new Interpreter(code);
     try {
-        while (interpreter.step() == 0) { }
+        while (interpreter.step() == 0) {
+            if (interpreter.cycle > 2048) {
+                throw new Error("Infinite loop");
+            }
+        }
     } catch (error) {
-        console.error(error);
         console.log({ interpreter })
+        throw error;
     }
     if (interpreter.warning.length > 0) {
         console.warn(interpreter.warning);
@@ -25,7 +29,15 @@ describe('interpreter', () => {
         fadd f8, f10, f4
         `
         run_code(code);
-    }, 10);
+    }, 1);
+    test('tomasulo-self-calculate', () => {
+        const code = `
+        fdiv f2, f2, f2
+        fdiv f2, f4, f6
+        fdiv f2, f2, f4
+        `
+        run_code(code);
+    }, 1);
     test('interget', () => {
         const code = `
         add x1, x0, x2
@@ -36,7 +48,7 @@ describe('interpreter', () => {
         sub x2, x0, x1
         `
         run_code(code);
-    }, 10);
+    }, 1);
     test('interget', () => {
         const code = `
         # comment
@@ -52,5 +64,5 @@ describe('interpreter', () => {
         # comment
         `
         run_code(code);
-    }, 10);
+    }, 1);
 })

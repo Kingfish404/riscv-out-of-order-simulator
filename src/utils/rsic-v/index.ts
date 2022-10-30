@@ -3,12 +3,14 @@ import { IntegerRegister, FloatingPointRegister } from "./hardware";
 
 export enum InstructionStage {
   IF = 'IF',
+  ID = 'ID',
   EX = 'EX',
+  MEM = 'MEM',
   WB = 'WB',
 }
 
 type Station = {
-  busy: boolean, name: string, value?: number, address?: string,
+  busy: boolean, name: string, op: string, v?: number, a?: string,
   qi?: string, qj?: string, qk?: string, vi?: number, vj?: number, vk?: number,
 };
 
@@ -24,17 +26,18 @@ export class Interpreter {
   // tomasulo algorithm station
   reservation_station: {
     name: string, busy: boolean, op: string,
-    vj: number, vk: number, qj: string, qk: string
+    vj: number, vk: number, qj: string, qk: string, a: string, v: number,
   }[] = [
-      { name: 'fadd1', busy: false, op: '', vj: 0, vk: 0, qj: '', qk: '' },
-      { name: 'fadd2', busy: false, op: '', vj: 0, vk: 0, qj: '', qk: '' },
-      { name: 'fadd3', busy: false, op: '', vj: 0, vk: 0, qj: '', qk: '' },
-      { name: 'fmul1', busy: false, op: '', vj: 0, vk: 0, qj: '', qk: '' },
-      { name: 'fmul2', busy: false, op: '', vj: 0, vk: 0, qj: '', qk: '' },
+      { name: 'load1', busy: false, op: '', vj: 0, vk: 0, qj: '', qk: '', a: '', v: 0 },
+      { name: 'load2', busy: false, op: '', vj: 0, vk: 0, qj: '', qk: '', a: '', v: 0 },
+      { name: 'fadd1', busy: false, op: '', vj: 0, vk: 0, qj: '', qk: '', a: '', v: 0 },
+      { name: 'fadd2', busy: false, op: '', vj: 0, vk: 0, qj: '', qk: '', a: '', v: 0 },
+      { name: 'fadd3', busy: false, op: '', vj: 0, vk: 0, qj: '', qk: '', a: '', v: 0 },
+      { name: 'fmul1', busy: false, op: '', vj: 0, vk: 0, qj: '', qk: '', a: '', v: 0 },
+      { name: 'fmul2', busy: false, op: '', vj: 0, vk: 0, qj: '', qk: '', a: '', v: 0 },
     ];
-  load_station: { name: string, busy: boolean, address: string, value: number }[] = [];
   floating_point_station: {
-    name: string, value: any, busy: boolean, qi: string,
+    name: string, busy: boolean, op: string, qi: string, vi: any,
   }[] = [];
 
   // cpu pipeline state
@@ -59,11 +62,9 @@ export class Interpreter {
     this.instructions = instruction.split('\n').map((line) => {
       return line.trim();
     }).filter((line) => line.length > 0 && !line.startsWith("#"));
-    for (let i = 0; i < 3; i++) {
-      this.load_station.push({ name: `load${i}`, busy: false, address: '', value: 0 });
-    }
     for (let i = 0; i < 32; i++) {
-      this.floating_point_station.push({ name: `f${i}`, busy: false, qi: '', value: 0 });
+      this.floating_point_station
+        .push({ name: `f${i}`, busy: false, op: '', qi: '', vi: 0 });
     }
   }
 
@@ -188,37 +189,34 @@ export class Interpreter {
         return trimmed;
       });
       let can_fetch = false;
-      let station: Station = { name: '', busy: false, value: 0, qi: '', qj: '', qk: '' }
+      let station: Station = { name: '', busy: false, op: '', v: 0, qi: '', qj: '', qk: '' }
       switch (op) {
         case 'fsd':
         case 'fld':
-          for (let cur_station of this.load_station) {
-            if (!cur_station.busy) {
-              cur_station.address = tokens[1] as string;
-              can_fetch = true;
-              station = cur_station;
-              break
-            }
+          for (let cur_station of this.reservation_station
+            .filter((station) => station.busy == false && station.name.startsWith('load'))) {
+            cur_station.a = tokens[1] as string;
+            can_fetch = true;
+            station = cur_station;
+            break
           }
           break
         case 'fmul':
         case 'fdiv':
-          for (let cur_station of this.reservation_station) {
-            if (cur_station.name.startsWith('fmul') && !cur_station.busy) {
-              can_fetch = true;
-              station = cur_station;
-              break;
-            }
+          for (let cur_station of this.reservation_station
+            .filter((station) => station.busy == false && station.name.startsWith('fmul'))) {
+            can_fetch = true;
+            station = cur_station;
+            break;
           }
           break
         case 'fsub':
         case 'fadd':
-          for (let cur_station of this.reservation_station) {
-            if (cur_station.name.startsWith('fadd') && !cur_station.busy) {
-              can_fetch = true;
-              station = cur_station;
-              break;
-            }
+          for (let cur_station of this.reservation_station
+            .filter((station) => station.busy == false && station.name.startsWith('fadd'))) {
+            can_fetch = true;
+            station = cur_station;
+            break;
           }
           break
         default:
@@ -245,7 +243,7 @@ export class Interpreter {
               } else {
                 // Register['D'].Vj = S1
                 // Register['D'].Qj = ''
-                station.vj = this.floating_point_station[fid].value;
+                station.vj = this.floating_point_station[fid].vi;
                 station.qj = '';
               }
             } else if (i == 2) {
@@ -256,26 +254,20 @@ export class Interpreter {
               } else {
                 // Register['D'].Vk = S1
                 // Register['D'].Qk = ''
-                station.vk = this.floating_point_station[fid].value;
+                station.vk = this.floating_point_station[fid].vi;
                 station.qk = '';
               }
             }
           }
         }
         station.busy = true;
+        station.op = op;
 
         const unit = {
-          op: op,
-          tokens: tokens,
-          pc: this.pc,
-          stage: InstructionStage.IF,
-          C_need: 1,
-          IF: this.cycle,
-          EX_S: -1,
-          EX_E: -1,
-          WB: -1,
-          station: station,
-          instruction: instruction,
+          op: op, tokens: tokens, pc: this.pc,
+          stage: InstructionStage.IF, C_need: 1,
+          IF: this.cycle, EX_S: -1, EX_E: -1, WB: -1,
+          station: station, instruction: instruction,
         }
         this.pipeline.push(unit);
         this.pipeline_history.push(unit);
@@ -285,50 +277,38 @@ export class Interpreter {
 
     // execute
     for (let unit of this.pipeline.filter((unit) => unit.stage == InstructionStage.EX)) {
-      const { op, tokens } = unit;
-      let can_execute = true;
+      const { op } = unit;
       if (unit.EX_S == -1) {
-        can_execute = false;
-        switch (op) {
-          case 'fld':
-          case 'fsd':
-            can_execute = true;
-            unit.C_need = 2;
-            break
-          case 'fadd':
-          case 'fsub':
-            unit.C_need = 2;
-            if (unit.station.qj === '' && unit.station.qk === '') {
-              can_execute = true;
-            }
-            break
-          case 'fmul':
-            unit.C_need = 10;
-            if (unit.station.qj === '' && unit.station.qk === '') {
-              can_execute = true;
-            }
-            break
-          case 'fdiv':
-            unit.C_need = 40;
-            if (unit.station.qj === '' && unit.station.qk === '') {
-              can_execute = true;
-            }
-            break
-          default:
-            can_execute = true;
-            unit.C_need = 1;
-            break
-        }
-        if (can_execute) {
+        if ((unit.station.qj == unit.station.name || unit.station.qj === '')
+          && (unit.station.qk == unit.station.name || unit.station.qk === '')) {
           unit.EX_S = this.cycle;
+          switch (op) {
+            case 'fld':
+            case 'fsd':
+              unit.C_need = 2;
+              break
+            case 'fadd':
+            case 'fsub':
+              unit.C_need = 2;
+              break
+            case 'fmul':
+              unit.C_need = 10;
+              break
+            case 'fdiv':
+              unit.C_need = 40;
+              break
+            default:
+              unit.C_need = 1;
+              break
+          }
+        } else {
+          continue;
         }
       }
-      if (can_execute) {
-        unit.C_need--;
-        if (unit.C_need == -1) {
-          unit.stage = InstructionStage.WB;
-          unit.EX_E = this.cycle;
-        }
+      unit.C_need--;
+      if (unit.C_need == -1) {
+        unit.stage = InstructionStage.WB;
+        unit.EX_E = this.cycle;
       }
     }
 
@@ -373,8 +353,8 @@ export class Interpreter {
           this.fld(tokens[0] as keyof FloatingPointRegister,
             imm,
             rs1 as keyof IntegerRegister);
-          unit.station.value = this.f_register[tokens[0] as keyof FloatingPointRegister];
-          unit.station.address = ''
+          unit.station.v = this.f_register[tokens[0] as keyof FloatingPointRegister];
+          unit.station.a = ''
           break;
         case 'fsd':
           const address2 = tokens[1] as string;
@@ -388,25 +368,25 @@ export class Interpreter {
           this.fmul(tokens[0] as keyof FloatingPointRegister,
             tokens[1] as keyof FloatingPointRegister,
             tokens[2] as keyof FloatingPointRegister);
-          unit.station.value = this.f_register[tokens[0] as keyof FloatingPointRegister];
+          unit.station.v = this.f_register[tokens[0] as keyof FloatingPointRegister];
           break;
         case 'fdiv':
           this.fdiv(tokens[0] as keyof FloatingPointRegister,
             tokens[1] as keyof FloatingPointRegister,
             tokens[2] as keyof FloatingPointRegister);
-          unit.station.value = this.f_register[tokens[0] as keyof FloatingPointRegister];
+          unit.station.v = this.f_register[tokens[0] as keyof FloatingPointRegister];
           break;
         case 'fsub':
           this.fsub(tokens[0] as keyof FloatingPointRegister,
             tokens[1] as keyof FloatingPointRegister,
             tokens[2] as keyof FloatingPointRegister);
-          unit.station.value = this.f_register[tokens[0] as keyof FloatingPointRegister];
+          unit.station.v = this.f_register[tokens[0] as keyof FloatingPointRegister];
           break;
         case 'fadd':
           this.fadd(tokens[0] as keyof FloatingPointRegister,
             tokens[1] as keyof FloatingPointRegister,
             tokens[2] as keyof FloatingPointRegister);
-          unit.station.value = this.f_register[tokens[0] as keyof FloatingPointRegister];
+          unit.station.v = this.f_register[tokens[0] as keyof FloatingPointRegister];
           break;
         default:
           this.warning.push("WARN: Unknown instruction [line " + unit.pc / 4 + "]: " + unit.instruction);
@@ -418,17 +398,17 @@ export class Interpreter {
       for (let cur_station of this.floating_point_station) {
         if (cur_station.qi == unit.station.name) {
           cur_station.qi = '';
-          cur_station.value = unit.station.value;
+          cur_station.vi = unit.station.v;
         }
       }
       for (let cur_station of this.reservation_station) {
         if (cur_station.qj == unit.station.name) {
           cur_station.qj = '';
-          cur_station.vj = unit.station.value != undefined ? unit.station.value : 0;
+          cur_station.vj = unit.station.v != undefined && !isNaN(unit.station.v) ? unit.station.v : 0;
         }
         if (cur_station.qk == unit.station.name) {
           cur_station.qk = '';
-          cur_station.vk = unit.station.value != undefined ? unit.station.value : 0;
+          cur_station.vk = unit.station.v != undefined && !isNaN(unit.station.v) ? unit.station.v : 0;
         }
       }
       unit.station.busy = false;
