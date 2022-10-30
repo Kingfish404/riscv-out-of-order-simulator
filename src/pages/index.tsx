@@ -16,14 +16,17 @@ const { TextArea } = Input;
 export const title = "RISC-V (Sub-Set) Out-of-Order Interpreter"
 
 const Home: NextPage = () => {
-  const [interpreter, setInterpreter] = useState<Interpreter>(new Interpreter(''));
-  const [history, setHistory] = useState<Interpreter[]>([]);
   const [code, setCode] = useState(
     `fadd f2,f2,f2\nadd x1, x0, x2\naddi x1, x0, 10\nsub x2, x0, x1\n` +
     `fld f8, 21(x3)\nfld f4, 16(x4)\nfsd f4, 0(x0)\n` +
     `fmul f2, f4, f6\nfsub f10, f8, f4\nfdiv f12, f2, f8\nfadd f8, f10, f4\n`)
-  const [reload, setReload] = useState<SetStateAction<boolean>>(false)
-  const [contenteditable, setContenteditable] = useState(false);
+  const [interpreter, setInterpreter] = useState<Interpreter>(new Interpreter(code));
+  const [reload, setReload] = useState<boolean>(false)
+  const [history, setHistory] = useState<Interpreter[]>([]);
+  const [contenteditable, setContenteditable] = useState(true);
+  const reflash = () => {
+    setReload(!reload);
+  }
   return (
     <div className={styles.container}>
       <Head>
@@ -45,8 +48,9 @@ const Home: NextPage = () => {
               style={{ width: '100%', height: '100%', fontFamily: 'monospace' }}
               value={code}
               onChange={(e: { target: { value: string; }; }) => {
-                setCode(e.target.value);
-                setInterpreter(new Interpreter(e.target.value));
+                const value = e.target.value;
+                setCode(value);
+                setInterpreter(new Interpreter(value));
                 while (history.length > 0) {
                   history.pop();
                 };
@@ -58,42 +62,22 @@ const Home: NextPage = () => {
             <Space >
               <Button onClick={
                 () => {
-                  if (interpreter.cycle === 0) {
-                    const new_interpreter = new Interpreter(code);
-                    do {
-                      if (history.length == 0 ||
-                        new_interpreter.cycle === history[history.length - 1].cycle + 1) {
-                        history.push(structuredClone(new_interpreter));
-                      }
-                    } while (new_interpreter.step() == 0);
-                    setInterpreter(new_interpreter);
-                    setContenteditable(true);
-                  } else {
-                    const last_state = structuredClone(interpreter);
-                    while (interpreter.step() == 0) {
-                      if (interpreter.cycle === last_state.cycle + 1) {
-                        history.push(last_state);
-                      }
+                  const last_state = structuredClone(interpreter);
+                  while (interpreter.step() == 0) {
+                    if (interpreter.cycle === last_state.cycle + 1) {
+                      history.push(last_state);
                     }
-                    setReload(!reload);
                   }
+                  setReload(!reload);
                 }
               } >Run</Button>
               <Button onClick={
                 () => {
-                  if (interpreter.cycle === 0) {
-                    const new_interpreter = new Interpreter(code);
-                    history.push(structuredClone(new_interpreter))
-                    new_interpreter.step();
-                    setInterpreter(new_interpreter);
-                    setContenteditable(true);
-                  } else {
-                    const last_state = structuredClone(interpreter);
-                    interpreter.step();
-                    if (interpreter.cycle === last_state.cycle + 1) {
-                      history.push(structuredClone(last_state))
-                      setReload(!reload);
-                    }
+                  const last_state = structuredClone(interpreter);
+                  interpreter.step();
+                  if (interpreter.cycle === last_state.cycle + 1) {
+                    history.push(structuredClone(last_state))
+                    setReload(!reload);
                   }
                 }
               } >Step</Button>
@@ -112,8 +96,8 @@ const Home: NextPage = () => {
                   while (history.length > 0) {
                     history.pop();
                   }
-                  setInterpreter(new Interpreter(''));
-                  setContenteditable(false);
+                  setInterpreter(new Interpreter(code));
+                  setReload(!reload);
                 }
               } >Reset</Button>
             </Space>
@@ -122,27 +106,27 @@ const Home: NextPage = () => {
             <h2>Registers and MEM</h2>
             <div>
               <h3>Integer Register</h3>
-              <EditableTable data={interpreter.x_register} contenteditable={contenteditable} />
+              <EditableTable data={interpreter.x_register} refresh={setReload} contenteditable={contenteditable} />
             </div>
             <div>
               <h3 style={{ display: 'inline-block' }}>PC: {interpreter.pc}</h3>
             </div>
             <div>
               <h3>Floating Point Register (Extension)</h3>
-              <EditableTable data={interpreter.f_register} contenteditable={contenteditable} />
+              <EditableTable data={interpreter.f_register} refresh={setReload} contenteditable={contenteditable} />
             </div>
             <div>
               <h3 style={{ display: 'inline-block' }}>FCSR: {interpreter.fcsr}</h3>
             </div>
             <div>
               <h3>MEM</h3>
-              <EditableTable data={interpreter.mem} contenteditable={contenteditable} />
+              <EditableTable data={interpreter.mem} refresh={reflash} contenteditable={contenteditable} />
             </div>
           </div>
           <div className={styles.grid_item}>
             <h2>Pipline History</h2>
             <div>
-              <EditableTable data={interpreter.pipeline_history} />
+              <EditableTable data={interpreter.pipeline_history} refresh={reflash} />
             </div>
           </div>
           <div className={styles.grid_item}>
@@ -152,11 +136,11 @@ const Home: NextPage = () => {
             }>
               <div style={{ margin: '0 1rem 1rem 0' }}>
                 <p>Reservation Station</p>
-                <EditableTable data={interpreter.reservation_station} />
+                <EditableTable data={interpreter.reservation_station} refresh={reflash} />
               </div>
               <div style={{ margin: '0 1rem 1rem 0' }}>
                 <p>Floating Point Station</p>
-                <EditableTable data={interpreter.floating_point_station} />
+                <EditableTable data={interpreter.floating_point_station} refresh={reflash} />
               </div>
             </div>
           </div>

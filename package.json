@@ -6,6 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "preexport": "next build",
+    "export": "next export",
     "lint": "next lint",
     "test": "jest"
   },

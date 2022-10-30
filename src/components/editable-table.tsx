@@ -1,7 +1,7 @@
 export function EditableTable(props: {
-    data: any | Array<any>, contenteditable?: boolean
+    data: any | Array<any>, contenteditable?: boolean, refresh?: CallableFunction
 } = { data: {}, contenteditable: false }) {
-    const { data, contenteditable } = props;
+    const { data, contenteditable, refresh } = props;
     // if data is array
     const head_data: string[] = [];
     const body_data: any[][] = [];
@@ -43,6 +43,9 @@ export function EditableTable(props: {
                                         data[j] = isNaN(value) ? 0 : value;
                                     } else {
                                         data[head_data[j]] = isNaN(value) ? 0 : value;
+                                    }
+                                    if (refresh) {
+                                        refresh();
                                     }
                                 }}
                                 style={{
