@@ -1,5 +1,5 @@
 import { IntegerRegister, FloatingPointRegister } from "./hardware";
-
+import { RV64I, RV64D } from "./isa";
 
 export enum InstructionStage {
   IF = 'IF',
@@ -108,15 +108,11 @@ export class Interpreter {
     this.x_register[rd] = this.x_register[rs1] - this.x_register[rs2];
   }
 
-  subi(rd: keyof IntegerRegister,
-    rs1: keyof IntegerRegister,
-    imm: number) {
-    if (rd == 'x0') {
-      return;
+  jal(rd: keyof IntegerRegister, imm: number) {
+    if (rd != 'x0') {
+      this.x_register[rd] = this.pc + 4;
     }
-    imm = this.normalizeImm(imm);
-    imm = this.immPad(imm);
-    this.x_register[rd] = this.x_register[rs1] - imm;
+    this.pc = imm;
   }
 
   fld(rd: keyof FloatingPointRegister, imm: number, rs1: keyof IntegerRegister) {
@@ -191,8 +187,8 @@ export class Interpreter {
       let can_fetch = false;
       let station: Station = { name: '', busy: false, op: '', v: 0, qi: '', qj: '', qk: '' }
       switch (op) {
-        case 'fsd':
-        case 'fld':
+        case RV64D.FSD:
+        case RV64D.FLD:
           for (let cur_station of this.reservation_station
             .filter((station) => station.busy == false && station.name.startsWith('load'))) {
             cur_station.a = tokens[1] as string;
@@ -201,19 +197,19 @@ export class Interpreter {
             break
           }
           break
-        case 'fmul':
-        case 'fdiv':
+        case RV64D.FADD:
+        case RV64D.FSUB:
           for (let cur_station of this.reservation_station
-            .filter((station) => station.busy == false && station.name.startsWith('fmul'))) {
+            .filter((station) => station.busy == false && station.name.startsWith('fadd'))) {
             can_fetch = true;
             station = cur_station;
             break;
           }
           break
-        case 'fsub':
-        case 'fadd':
+        case RV64D.FMUL:
+        case RV64D.FDIV:
           for (let cur_station of this.reservation_station
-            .filter((station) => station.busy == false && station.name.startsWith('fadd'))) {
+            .filter((station) => station.busy == false && station.name.startsWith('fmul'))) {
             can_fetch = true;
             station = cur_station;
             break;
@@ -223,7 +219,7 @@ export class Interpreter {
           can_fetch = true;
           break
       }
-      if (can_fetch) {
+      if (can_fetch && this.pipeline.find((unit) => unit.op == 'jal') == undefined) {
         this.log.push('Fetch: ' + instruction + ', PC: ' + this.pc);
         for (let i = 0; i < tokens.length; i++) {
           if (typeof tokens[i] != 'string') {
@@ -283,18 +279,18 @@ export class Interpreter {
           && (unit.station.qk == unit.station.name || unit.station.qk === '')) {
           unit.EX_S = this.cycle;
           switch (op) {
-            case 'fld':
-            case 'fsd':
+            case RV64D.FSD:
+            case RV64D.FLD:
               unit.C_need = 2;
               break
-            case 'fadd':
-            case 'fsub':
+            case RV64D.FADD:
+            case RV64D.FSUB:
               unit.C_need = 2;
               break
-            case 'fmul':
+            case RV64D.FMUL:
               unit.C_need = 10;
               break
-            case 'fdiv':
+            case RV64D.FDIV:
               unit.C_need = 40;
               break
             default:
@@ -320,12 +316,12 @@ export class Interpreter {
       }
       const { op, tokens } = unit;
       switch (op) {
-        case 'add':
+        case RV64I.ADD:
           this.add(tokens[0] as keyof IntegerRegister,
             tokens[1] as keyof IntegerRegister,
             tokens[2] as keyof IntegerRegister);
           break;
-        case 'addi':
+        case RV64I.ADDI:
           if (typeof tokens[2] != 'number') {
             throw new Error("ADDI: Immediate is not a number");
           }
@@ -333,20 +329,18 @@ export class Interpreter {
             tokens[1] as keyof IntegerRegister,
             tokens[2]);
           break;
-        case 'sub':
+        case RV64I.SUB:
           this.sub(tokens[0] as keyof IntegerRegister,
             tokens[1] as keyof IntegerRegister,
             tokens[2] as keyof IntegerRegister);
           break;
-        case 'subi':
-          if (typeof tokens[2] != 'number') {
-            throw new Error("SUBI: Immediate is not a number");
+        case RV64I.JAL:
+          if (typeof tokens[1] != 'number') {
+            throw new Error("JAL: Immediate is not a number");
           }
-          this.subi(tokens[0] as keyof IntegerRegister,
-            tokens[1] as keyof IntegerRegister,
-            tokens[2]);
+          this.jal(tokens[0], tokens[1]);
           break;
-        case 'fld':
+        case RV64D.FLD:
           const address = tokens[1] as string;
           const imm = parseInt(address.split('(')[0]);
           const rs1 = address.split('(')[1].split(')')[0];
@@ -356,7 +350,7 @@ export class Interpreter {
           unit.station.v = this.f_register[tokens[0] as keyof FloatingPointRegister];
           unit.station.a = ''
           break;
-        case 'fsd':
+        case RV64D.FSD:
           const address2 = tokens[1] as string;
           const imm2 = parseInt(address2.split('(')[0]);
           const rs12 = address2.split('(')[1].split(')')[0];
@@ -364,26 +358,26 @@ export class Interpreter {
             imm2,
             rs12 as keyof IntegerRegister);
           break;
-        case 'fmul':
-          this.fmul(tokens[0] as keyof FloatingPointRegister,
+        case RV64D.FADD:
+          this.fadd(tokens[0] as keyof FloatingPointRegister,
             tokens[1] as keyof FloatingPointRegister,
             tokens[2] as keyof FloatingPointRegister);
           unit.station.v = this.f_register[tokens[0] as keyof FloatingPointRegister];
           break;
-        case 'fdiv':
-          this.fdiv(tokens[0] as keyof FloatingPointRegister,
-            tokens[1] as keyof FloatingPointRegister,
-            tokens[2] as keyof FloatingPointRegister);
-          unit.station.v = this.f_register[tokens[0] as keyof FloatingPointRegister];
-          break;
-        case 'fsub':
+        case RV64D.FSUB:
           this.fsub(tokens[0] as keyof FloatingPointRegister,
             tokens[1] as keyof FloatingPointRegister,
             tokens[2] as keyof FloatingPointRegister);
           unit.station.v = this.f_register[tokens[0] as keyof FloatingPointRegister];
           break;
-        case 'fadd':
-          this.fadd(tokens[0] as keyof FloatingPointRegister,
+        case RV64D.FMUL:
+          this.fmul(tokens[0] as keyof FloatingPointRegister,
+            tokens[1] as keyof FloatingPointRegister,
+            tokens[2] as keyof FloatingPointRegister);
+          unit.station.v = this.f_register[tokens[0] as keyof FloatingPointRegister];
+          break;
+        case RV64D.FDIV:
+          this.fdiv(tokens[0] as keyof FloatingPointRegister,
             tokens[1] as keyof FloatingPointRegister,
             tokens[2] as keyof FloatingPointRegister);
           unit.station.v = this.f_register[tokens[0] as keyof FloatingPointRegister];

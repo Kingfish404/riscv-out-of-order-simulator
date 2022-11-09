@@ -1,7 +1,9 @@
 import type { NextPage } from 'next'
 import Head from 'next/head'
-import { SetStateAction, useState } from 'react'
+import { useState, useCallback } from 'react'
 import { Input, Button, Space } from 'antd';
+import CodeMirror from '@uiw/react-codemirror';
+import { ViewUpdate } from '@codemirror/view';
 import 'core-js/actual/structured-clone';
 import { EditableTable } from '../components';
 import {
@@ -36,7 +38,7 @@ const Home: NextPage = () => {
       </Head>
       <header>
         <Space>
-          <Link href="/"><a className={styles.title}>{title}</a></Link>
+          <Link href="/" className={styles.title}>{title}</Link>
           <Link href="/docs"><Button type='link' >Docs</Button></Link>
         </Space>
       </header>
@@ -44,29 +46,27 @@ const Home: NextPage = () => {
         <div className={styles.grid}>
           <div className={styles.grid_item}>
             <h2>Code place</h2>
-            <TextArea
-              style={{ width: '100%', height: '100%', fontFamily: 'monospace' }}
+            <CodeMirror
               value={code}
-              onChange={(e: { target: { value: string; }; }) => {
-                const value = e.target.value;
+              className={styles.code}
+              maxHeight={'300px'}
+              onChange={useCallback((value: string, viewUpdate: ViewUpdate) => {
                 setCode(value);
                 setInterpreter(new Interpreter(value));
                 while (history.length > 0) {
                   history.pop();
                 };
-              }}
-              placeholder="ASM code"
-              autoSize={{ minRows: 10, maxRows: 10 }}
+              }, [history])}
             />
-            <hr />
             <Space >
               <Button onClick={
                 () => {
-                  const last_state = structuredClone(interpreter);
+                  let last_state = structuredClone(interpreter);
                   while (interpreter.step() == 0) {
                     if (interpreter.cycle === last_state.cycle + 1) {
                       history.push(last_state);
                     }
+                    last_state = structuredClone(interpreter);
                   }
                   setReload(!reload);
                 }

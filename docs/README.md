@@ -1,10 +1,21 @@
 ## Docs
 
+### CPU and Pipeline
+
+[risc-v core-code](/src/utils/rsic-v/index.ts)
+
+Pipline:  
+- IF: Instruction Fetch
+- EX: Execution
+- WB: Write Back
+
 ### Supported Instructions
 
 `ADD` rd, rs1, rs2  
 `ADDI` rd, rs1, imm  
 `SUB` rd, rs1, rs2  
+
+`JAL` rd, imm
 
 `FLD` rd, imm(rs1) : rd <- MEM[rs1+imm]  
 `FSD` rs2, imm(rs1) : MEM[rs1+imm] <- rs2  

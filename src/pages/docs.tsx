@@ -16,7 +16,7 @@ export default function Page() {
       </Head>
       <header>
         <Space>
-          <Link href="/"><a className={styles.title}>{title}</a></Link>
+          <Link href="/" className={styles.title}>{title}</Link>
           <Link href="/docs"><Button type='link' >Docs</Button></Link>
         </Space>
       </header>
